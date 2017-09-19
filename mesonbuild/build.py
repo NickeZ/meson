@@ -1082,8 +1082,17 @@ class Generator:
         basename = os.path.splitext(plainname)[0]
         return [x.replace('@BASENAME@', basename).replace('@PLAINNAME@', plainname) for x in self.arglist]
 
-    def process_files(self, name, files, state, extra_args=[]):
-        output = GeneratedList(self, extra_args=extra_args)
+    def process_files(self, name, files, state, extra_args=[], extra_depends=[]):
+        deps = []
+        #for ed in extra_depends:
+        #    deps.append(File.from_absolute_file(ed).rel_to_builddir())
+        #for ed in extra_depends:
+        #    while hasattr(ed, 'held_object'):
+        #        ed = ed.held_object
+        #    if not isinstance(ed, (CustomTarget, BuildTarget)):
+        #        raise InvalidArguments('Can only depend on toplevel targets: custom_target or build_target (executable or a library)')
+        #    deps.append(ed)
+        output = GeneratedList(self, extra_args=extra_args, extra_depends=deps)
         for f in files:
             if isinstance(f, str):
                 f = File.from_source_file(state.environment.source_dir, state.subdir, f)
@@ -1094,7 +1103,7 @@ class Generator:
 
 
 class GeneratedList:
-    def __init__(self, generator, extra_args=[]):
+    def __init__(self, generator, extra_args=[], extra_depends=[]):
         if hasattr(generator, 'held_object'):
             generator = generator.held_object
         self.generator = generator
@@ -1102,7 +1111,7 @@ class GeneratedList:
         self.infilelist = []
         self.outfilelist = []
         self.outmap = {}
-        self.extra_depends = []
+        self.extra_depends = extra_depends
         self.extra_args = extra_args
 
     def add_file(self, newfile):
@@ -1125,6 +1134,9 @@ class GeneratedList:
 
     def get_extra_args(self):
         return self.extra_args
+
+    def get_extra_depends(self):
+        return self.extra_depends
 
 class Executable(BuildTarget):
     def __init__(self, name, subdir, subproject, is_cross, sources, objects, environment, kwargs):
