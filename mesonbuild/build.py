@@ -1084,8 +1084,14 @@ class Generator:
 
     def process_files(self, name, files, state, extra_args=[], extra_depends=[]):
         deps = []
-        #for ed in extra_depends:
-        #    deps.append(File.from_absolute_file(ed).rel_to_builddir())
+        for ed in extra_depends:
+            while hasattr(ed, 'held_object'):
+                ed = ed.held_object
+            for output in ed.get_outputs():
+                deps.append(os.path.join(ed.get_subdir(), output))
+                print(os.path.join(ed.get_subdir(), output))
+            print(ed.get_outputs())
+            #deps.append(File.from_built_file(ed))
         #for ed in extra_depends:
         #    while hasattr(ed, 'held_object'):
         #        ed = ed.held_object

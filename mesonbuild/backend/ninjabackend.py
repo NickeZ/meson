@@ -1785,7 +1785,9 @@ rule FORTRAN_DEP_HACK
         exe_arr = self.exe_object_to_cmd_array(exe)
         infilelist = genlist.get_inputs()
         outfilelist = genlist.get_outputs()
-        extra_dependencies = [os.path.join(self.build_to_src, i) for i in genlist.extra_depends]
+        extra_dependencies = [os.path.join(self.build_to_src, i) for i in genlist.get_extra_depends()]
+        print(infilelist)
+        print(extra_dependencies)
         source_target_dir = self.get_target_source_dir(target)
         for i in range(len(infilelist)):
             if len(generator.outputs) == 1:
