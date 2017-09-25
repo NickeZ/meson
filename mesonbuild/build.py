@@ -1088,7 +1088,9 @@ class Generator:
             while hasattr(ed, 'held_object'):
                 ed = ed.held_object
             for output in ed.get_outputs():
-                deps.append(os.path.join(ed.get_subdir(), output))
+                deps.append(ed.rel_to_builddir(os.path.join(ed.get_subdir(), output)))
+                #deps.append(os.path.join(ed.get_subdir(), output))
+                #deps.append(output)
                 print(os.path.join(ed.get_subdir(), output))
             print(ed.get_outputs())
             #deps.append(File.from_built_file(ed))
