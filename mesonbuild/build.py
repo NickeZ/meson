@@ -1083,16 +1083,25 @@ class Generator:
         return [x.replace('@BASENAME@', basename).replace('@PLAINNAME@', plainname) for x in self.arglist]
 
     def process_files(self, name, files, state, extra_args=[], extra_depends=[]):
+        print(extra_depends)
         deps = []
         for ed in extra_depends:
             while hasattr(ed, 'held_object'):
                 ed = ed.held_object
-            for output in ed.get_outputs():
-                deps.append(ed.rel_to_builddir(os.path.join(ed.get_subdir(), output)))
+            print('ed: {}'.format(ed))
+            for f in ed.sources:
+                if isinstance(f, GeneratedList):
+                    for output in f.get_outputs():
+                        deps.append(os.path.join(ed.get_subdir(), output))
+                        print(output)
+                #if isinstance(f, str):
+                #    f = File.from_source_file(f)
+                #deps.append(f)
+                #deps.append(ed.rel_to_builddir(os.path.join(ed.get_subdir(), output)))
                 #deps.append(os.path.join(ed.get_subdir(), output))
                 #deps.append(output)
-                print(os.path.join(ed.get_subdir(), output))
-            print(ed.get_outputs())
+                #print(os.path.join(ed.get_subdir(), output))
+            #print(ed.get_outputs())
             #deps.append(File.from_built_file(ed))
         #for ed in extra_depends:
         #    while hasattr(ed, 'held_object'):
@@ -1104,9 +1113,13 @@ class Generator:
         for f in files:
             if isinstance(f, str):
                 f = File.from_source_file(state.environment.source_dir, state.subdir, f)
-            elif not isinstance(f, File):
+            elif isinstance(f, (GeneratedList, CustomTarget)):
+                mlog.log("hej")
+                self.generated.append(f)
+            if isinstance(f, File):
+                output.add_file(f)
+            else:
                 raise InvalidArguments('{} arguments must be strings or files not {!r}.'.format(name, f))
-            output.add_file(f)
         return output
 
 
