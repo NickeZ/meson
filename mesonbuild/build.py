@@ -1135,6 +1135,16 @@ class GeneratedList:
         self.extra_depends = extra_depends
         self.extra_args = extra_args
 
+    def __getitem__(self, index):
+        return GeneratedListIndex(self, self.outfilelist[index])
+
+    def __setitem__(self, index):
+        raise NotImplementedError
+
+    def __delitem__(self, index):
+        raise NotImplementedError
+
+
     def add_file(self, newfile):
         self.infilelist.append(newfile)
         outfiles = self.generator.get_base_outnames(newfile.fname)
@@ -1158,6 +1168,21 @@ class GeneratedList:
 
     def get_extra_depends(self):
         return self.extra_depends
+
+class GeneratedListIndex:
+    def __init__(self, target, output):
+        self.target = target
+        self.output = output
+
+    def __repr__(self):
+        return '<GeneratedListIndex {!r}[{}]>'.format(
+            self.target, self.target.output.index(self.output))
+
+    def get_outputs(self):
+        return [self.output]
+
+    def get_subdir(self):
+        return self.target.get_subdir()
 
 class Executable(BuildTarget):
     def __init__(self, name, subdir, subproject, is_cross, sources, objects, environment, kwargs):

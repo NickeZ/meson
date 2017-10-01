@@ -375,8 +375,22 @@ class GeneratedListHolder(InterpreterObject, ObjectHolder):
         r = '<{}: {!r}>'
         return r.format(self.__class__.__name__, self.held_object.get_outputs())
 
+    def __getitem__(self, index):
+        return GeneratedListIndexHolder(self.held_object[index])
+
+    def __setitem__(self, index):
+        raise InterpreterException('Cannot set a member of a GeneratedList')
+
+    def __delitem__(self, index):
+        raise InterpreterException('Cannot delete a member of a GeneratedList')
+
     def add_file(self, a):
         self.held_object.add_file(a)
+
+class GeneratedListIndexHolder(InterpreterObject):
+    def __init__(self, object_to_hold):
+        super().__init__()
+        self.held_object = object_to_hold
 
 class BuildMachine(InterpreterObject, ObjectHolder):
     def __init__(self, compilers):

@@ -28,6 +28,7 @@ plainname_gen = generator(prog2,
 plainname_src = plainname_gen.process('name.l')
 
 test('plainname', executable('plainname', plainname_src))
+test('plainname_index', executable('plainname_index', plainname_src[0]))
 
 prog3 = find_program('srcgen3.py')
 capture_gen = generator(prog3,
@@ -38,3 +39,8 @@ capture_gen = generator(prog3,
 capture_src = capture_gen.process('name.l')
 
 test('capture', executable('capture', capture_src))
+
+step1 = plainname_gen.process('name.l')
+step2 = capture_gen.process(step1[1])
+
+test('multi', executable('multi', step2))
