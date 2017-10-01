@@ -425,7 +425,7 @@ class BuildTarget(Target):
                 if s not in added_sources:
                     self.sources.append(s)
                     added_sources[s] = True
-            elif isinstance(s, (GeneratedList, CustomTarget, CustomTargetIndex)):
+            elif isinstance(s, (GeneratedList, GeneratedListIndex, CustomTarget, CustomTargetIndex)):
                 self.generated.append(s)
             else:
                 msg = 'Bad source of type {!r} in target {!r}.'.format(type(s).__name__, self.name)
@@ -1143,7 +1143,6 @@ class GeneratedList:
 
     def __delitem__(self, index):
         raise NotImplementedError
-
 
     def add_file(self, newfile):
         self.infilelist.append(newfile)
