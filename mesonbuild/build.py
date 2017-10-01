@@ -1017,6 +1017,7 @@ class Generator:
         self.depfile = None
         self.capture = False
         self.process_kwargs(kwargs)
+        self.generated = []
 
     def __repr__(self):
         repr_str = "<{0}: {1}>"
@@ -1111,9 +1112,11 @@ class Generator:
         #    deps.append(ed)
         output = GeneratedList(self, extra_args=extra_args, extra_depends=deps)
         for f in files:
+            while hasattr(f, 'held_object'):
+                f = f.held_object
             if isinstance(f, str):
                 f = File.from_source_file(state.environment.source_dir, state.subdir, f)
-            elif isinstance(f, (GeneratedList, CustomTarget)):
+            elif isinstance(f, (GeneratedList, GeneratedListIndex, CustomTarget, CustomTargetIndex)):
                 mlog.log("hej")
                 self.generated.append(f)
             if isinstance(f, File):
@@ -1175,7 +1178,7 @@ class GeneratedListIndex:
 
     def __repr__(self):
         return '<GeneratedListIndex {!r}[{}]>'.format(
-            self.target, self.target.output.index(self.output))
+            self.target, self.target.outfilelist.index(self.output))
 
     def get_outputs(self):
         return [self.output]

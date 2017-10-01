@@ -2811,7 +2811,7 @@ different subdirectory.
     def source_strings_to_files(self, sources):
         results = []
         for s in sources:
-            if isinstance(s, (mesonlib.File, GeneratedListHolder,
+            if isinstance(s, (mesonlib.File, GeneratedListHolder, GeneratedListIndexHolder,
                               CustomTargetHolder, CustomTargetIndexHolder)):
                 pass
             elif isinstance(s, str):

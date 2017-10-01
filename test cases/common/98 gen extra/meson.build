@@ -40,7 +40,7 @@ capture_src = capture_gen.process('name.l')
 
 test('capture', executable('capture', capture_src))
 
-step1 = plainname_gen.process('name.l')
-step2 = capture_gen.process(step1[1])
-
-test('multi', executable('multi', step2))
+#step1 = plainname_gen.process('name.l')
+#step2 = capture_gen.process(step1[1])
+#
+#test('multi', executable('multi', step2))
