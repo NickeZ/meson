@@ -259,7 +259,11 @@ def grab_leading_numbers(vstr, strict=False):
             break
     return result
 
-numpart = re.compile('[0-9.]+')
+# matches non-zeropadded numbers. Also doesn't match the trailing dot.
+# 123.345.456 or 0.1.2.3
+# NOT 01.2.3 or 1.02.3
+numpart = re.compile(r'(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*))+')
+# numpart = re.compile(r'[0-9.]+')
 
 def version_compare(vstr1, vstr2, strict=False):
     match = numpart.match(vstr1.strip())
