@@ -375,7 +375,13 @@ class GeneratorHolder(InterpreterObject, ObjectHolder):
 
     def process_method(self, args, kwargs):
         extras = mesonlib.stringlistify(kwargs.get('extra_args', []))
-        gl = self.held_object.process_files(args, self.interpreter, extra_args=extras)
+        out = []
+        for arg in args:
+            if isinstance(arg, GeneratedListHolder):
+                arg = arg.held_object.get_outputs_for(arg.held_object.get_inputs()[0])[0]
+                mlog.log("DEBUG converting GeneratedListHolder to string:", arg)
+            out.append(arg)
+        gl = self.held_object.process_files(out, self.interpreter, extra_args=extras)
         return GeneratedListHolder(gl)
 
 
