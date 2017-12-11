@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os, pickle, re, shlex, subprocess, sys
+import os, pickle, re, shlex, subprocess
 from collections import OrderedDict
 
 from . import backends
