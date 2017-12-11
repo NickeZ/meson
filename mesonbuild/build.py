@@ -1090,13 +1090,13 @@ class Generator:
         basename = os.path.splitext(plainname)[0]
         return [x.replace('@BASENAME@', basename).replace('@PLAINNAME@', plainname) for x in self.arglist]
 
-    def process_files(self, name, files, state, extra_args=[]):
+    def process_files(self, files, state, extra_args=[]):
         output = GeneratedList(self, extra_args=extra_args)
         for f in files:
             if isinstance(f, str):
                 f = File.from_source_file(state.environment.source_dir, state.subdir, f)
             elif not isinstance(f, File):
-                raise InvalidArguments('{} arguments must be strings or files not {!r}.'.format(name, f))
+                raise InvalidArguments('Generator arguments must be strings or files not {!r}.'.format(f))
             output.add_file(f)
         return output
 
