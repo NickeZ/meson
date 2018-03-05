@@ -56,26 +56,28 @@ def main(args):
                         # TODO: Do something with build scripts?
                     else:
                         shutil.move(name, target_name)
-                        update_d_file(dfile, name, target_name)
+                        update_d_file(dfile, name, target_name, 'exe')
                 elif extension in ['.a', '.so', '.dll']:
                     # Built a library
                     shutil.move(name, target_name)
-                    update_d_file(dfile, name, target_name)
-                elif extension == '.d':
-                    print('yay')
+                    update_d_file(dfile, name, target_name, 'sta')
 
 
-def update_d_file(dfile, old, new):
+def update_d_file(dfile, old, new, temp_dir_suffix):
     """Update d-file in-place"""
-    old = old.replace(' ', '\\ ')
-    new = new.replace(' ', '\\ ')
+    (stem, ext) = os.path.splitext(os.path.basename(new))
+    new_dfile = os.path.join(os.path.dirname(new), stem + '@' + temp_dir_suffix, stem + '.d')
+    old = os.path.splitext(old)[0].replace(' ', '\\ ')
+    new = os.path.splitext(new)[0].replace(' ', '\\ ')
     content = ''
+    if not os.path.isfile(dfile):
+        return
     with open(dfile) as dfile_r:
         content = dfile_r.read()
         content = content.replace(old, new)
-    with open(dfile, 'w') as dfile_w:
+    os.remove(dfile)
+    with open(new_dfile, 'w') as dfile_w:
         dfile_w.write(content)
-
 
 
 if __name__ == '__main__':

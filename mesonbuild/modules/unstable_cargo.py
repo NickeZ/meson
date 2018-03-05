@@ -130,7 +130,7 @@ class CargoModule(ExtensionModule):
             if t['kind'] != ['test']:
                 continue
             outputs.append(self._get_crate_name(name, 'bin', env))
-            temp_dir = '{}@bin'.format(os.path.splitext(outputs[-1])[0])
+            temp_dir = '{}@exe'.format(os.path.splitext(outputs[-1])[0])
             args = ['--test', name]
             break
         if outputs:
@@ -157,7 +157,7 @@ class CargoModule(ExtensionModule):
             if t['kind'] not in [['example'], ['bin']]:
                 continue
             outputs.append(self._get_crate_name(name, 'bin', env))
-            temp_dir = '{}@bin'.format(os.path.splitext(outputs[-1])[0])
+            temp_dir = '{}@exe'.format(os.path.splitext(outputs[-1])[0])
             if t['kind'][0] == 'example':
                 args = ['--example', name]
             else:
@@ -240,10 +240,7 @@ class CargoModule(ExtensionModule):
         # Get the list of outputs that cargo will create matching the specified name
         ctkwargs['output'], ctkwargs['depfile'], cargo_args, temp_dir = \
             self._get_cargo_outputs(name, md, env, cargo_target_type)
-        if self._is_release(env):
-            ctkwargs['depfile'] = os.path.join(temp_dir, 'release', ctkwargs['depfile'])
-        else:
-            ctkwargs['depfile'] = os.path.join(temp_dir, 'debug', ctkwargs['depfile'])
+        ctkwargs['depfile'] = os.path.join(temp_dir, ctkwargs['depfile'])
         # Set the files that will trigger a rebuild
         ctkwargs['depend_files'] = [toml] + self._get_sources(state, kwargs)
         # Cargo command that will build the output library/libraries/bins
