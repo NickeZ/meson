@@ -1,3 +1,3 @@
-cargo.static_library('mesonstatic',
+ruststatic = cargo.static_library('mesonstatic',
                      toml : 'Cargo.toml',
                      install : true)

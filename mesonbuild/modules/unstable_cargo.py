@@ -18,7 +18,7 @@ import json
 from .. import mlog
 from ..mesonlib import Popen_safe, Popen_safe_errors
 from ..mesonlib import extract_as_list, version_compare, MesonException, File
-from ..environment import for_windows, for_cygwin, for_darwin
+from ..mesonlib import for_windows, for_cygwin, for_darwin
 from ..interpreterbase import noKwargs, permittedKwargs
 from ..dependencies import InternalDependency
 from ..build import CustomTarget
@@ -30,7 +30,7 @@ target_kwargs = {'toml', 'sources', 'install', 'install_dir'}
 
 class CargoModule(ExtensionModule):
     cargo = ['cargo']
-    cargo_build = ['cargo', 'build', '-v', '--color=always']
+    cargo_build = ['meson_cargo_build_move.py', '-v', '--color=always']
     cargo_version = None
 
     def __init__(self):
@@ -81,10 +81,7 @@ class CargoModule(ExtensionModule):
             fname = prefix + name + '.' + suffix
         else:
             fname = prefix + name
-        if self._is_release(env):
-            return os.path.join('release', fname)
-        else:
-            return os.path.join('debug', fname)
+        return fname
 
     def _read_metadata(self, toml):
         cmd = self.cargo + ['metadata', '--format-version=1', '--no-deps',
@@ -121,6 +118,7 @@ class CargoModule(ExtensionModule):
         args = []
         outputs = []
         depfile = None
+        temp_dir = ''
         for t in metadata['targets']:
             if t['name'] != name:
                 continue
@@ -132,6 +130,7 @@ class CargoModule(ExtensionModule):
             if t['kind'] != ['test']:
                 continue
             outputs.append(self._get_crate_name(name, 'bin', env))
+            temp_dir = '{}@bin'.format(os.path.splitext(outputs[-1])[0])
             args = ['--test', name]
             break
         if outputs:
@@ -140,12 +139,13 @@ class CargoModule(ExtensionModule):
             toml = metadata['manifest_path']
             raise MesonException('no test called {!r} found in {!r}'
                                  ''.format(name, toml))
-        return outputs, depfile, args
+        return outputs, depfile, args, temp_dir
 
     def _get_cargo_executable_outputs(self, name, metadata, env):
         args = []
         outputs = []
         depfile = None
+        temp_dir = ''
         for t in metadata['targets']:
             if t['name'] != name:
                 continue
@@ -157,6 +157,7 @@ class CargoModule(ExtensionModule):
             if t['kind'] not in [['example'], ['bin']]:
                 continue
             outputs.append(self._get_crate_name(name, 'bin', env))
+            temp_dir = '{}@bin'.format(os.path.splitext(outputs[-1])[0])
             if t['kind'][0] == 'example':
                 args = ['--example', name]
             else:
@@ -168,12 +169,13 @@ class CargoModule(ExtensionModule):
             toml = metadata['manifest_path']
             raise MesonException('no bin called {!r} found in {!r}'
                                  ''.format(name, toml))
-        return outputs, depfile, args
+        return outputs, depfile, args, temp_dir
 
     def _get_cargo_static_library_outputs(self, name, metadata, env):
         args = []
         outputs = []
         depfile = None
+        temp_dir = ''
         for t in metadata['targets']:
             if t['name'] != name:
                 continue
@@ -185,6 +187,7 @@ class CargoModule(ExtensionModule):
             for ct in t['crate_types']:
                 if ct == 'staticlib':
                     outputs.append(self._get_crate_name(name, ct, env))
+                    temp_dir = '{}@sta'.format(os.path.splitext(outputs[-1])[0])
             if t['kind'][0] == 'example':
                 # If the library is an example, it must be built by name
                 args = ['--example', name]
@@ -198,7 +201,7 @@ class CargoModule(ExtensionModule):
             toml = metadata['manifest_path']
             raise MesonException('no staticlib called {!r} found '
                                  'in {!r}'.format(name, toml))
-        return outputs, depfile, args
+        return outputs, depfile, args, temp_dir
 
     def _get_cargo_outputs(self, name, metadata, env, cargo_target_type):
         # FIXME: track which outputs have already been fetched from
@@ -235,12 +238,19 @@ class CargoModule(ExtensionModule):
         # Warn about the cargo dep-info bug if needed
         self._check_cargo_dep_info_bug(md)
         # Get the list of outputs that cargo will create matching the specified name
-        ctkwargs['output'], ctkwargs['depfile'], cargo_args = \
+        ctkwargs['output'], ctkwargs['depfile'], cargo_args, temp_dir = \
             self._get_cargo_outputs(name, md, env, cargo_target_type)
+        if self._is_release(env):
+            ctkwargs['depfile'] = os.path.join(temp_dir, 'release', ctkwargs['depfile'])
+        else:
+            ctkwargs['depfile'] = os.path.join(temp_dir, 'debug', ctkwargs['depfile'])
         # Set the files that will trigger a rebuild
         ctkwargs['depend_files'] = [toml] + self._get_sources(state, kwargs)
         # Cargo command that will build the output library/libraries/bins
-        cmd = self._get_cargo_build(toml) + cargo_args
+        cmd = self._get_cargo_build(toml) + cargo_args + [
+            '--outdir', os.path.join(env.get_build_dir(), state.subdir),
+            '--target-dir', os.path.join(env.get_build_dir(), state.subdir, temp_dir)
+        ]
         if self._is_release(env):
             cmd.append('--release')
         ctkwargs['command'] = cmd
@@ -258,8 +268,6 @@ class CargoModule(ExtensionModule):
         ct = CustomTarget(name, state.subdir, state.subproject, ctkwargs)
         # Ninja buffers all cargo output so we get no status updates
         ct.ninja_pool = 'console'
-        # Force it to output in the current directory
-        ct.envvars['CARGO_TARGET_DIR'] = state.subdir
         # XXX: we need to call `cargo clean` on `ninja clean`.
         return md, ct
 
@@ -272,7 +280,11 @@ class CargoModule(ExtensionModule):
         # XXX: We add the output file into `sources`, but that creates
         # a compile-time dependency instead of a link-time dependency and
         # reduces parallelism.
-        d = InternalDependency(md['version'], [], [], [], [], [ct], [])
+        ct.is_linkable_target = dummy1
+        ct.is_cross = False
+        ct.compilers = {}
+        ct.get_all_link_deps = dummy2
+        d = InternalDependency(md['version'], [], [], [], [ct], [ct], [])
         return ModuleReturnValue(d, [d])
 
     @permittedKwargs(target_kwargs)
@@ -305,3 +317,9 @@ class CargoModule(ExtensionModule):
 
 def initialize():
     return CargoModule()
+
+def dummy1():
+    return True
+
+def dummy2():
+    return []
