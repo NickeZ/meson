@@ -16,11 +16,13 @@
 import stat
 import shlex
 import subprocess
-import re, json
+import re
+import json
 import tempfile
 import textwrap
 import os
 import shutil
+import sys
 import unittest
 from unittest import mock
 from configparser import ConfigParser
@@ -3311,7 +3313,7 @@ def unset_envs():
         if v in os.environ:
             del os.environ[v]
 
-if __name__ == '__main__':
+def main():
     unset_envs()
     cases = ['InternalTests', 'AllPlatformTests', 'FailureTests', 'PythonTests']
     if not is_windows():
@@ -3321,4 +3323,7 @@ if __name__ == '__main__':
     elif is_windows():
         cases += ['WindowsTests']
 
-    unittest.main(defaultTest=cases, buffer=True)
+    return unittest.main(defaultTest=cases, buffer=True)
+
+if __name__ == '__main__':
+    sys.exit(main())

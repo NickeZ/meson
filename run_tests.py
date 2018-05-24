@@ -21,10 +21,12 @@ import shutil
 import subprocess
 import tempfile
 import platform
+import argparse
 from mesonbuild import mesonlib
 from mesonbuild import mesonmain
 from mesonbuild import mlog
 from mesonbuild.environment import detect_ninja
+from mesonbuild.coredata import backendlist
 from io import StringIO
 from enum import Enum
 from glob import glob
@@ -164,25 +166,39 @@ def print_system_info():
     print('System:', platform.system())
     print('')
 
-if __name__ == '__main__':
+def main():
     print_system_info()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--cov', action='store_true')
+    parser.add_argument('--backend', default=None, dest='backend',
+                        choices=backendlist)
+    (options, _) = parser.parse_known_args()
     # Enable coverage early...
-    enable_coverage = '--cov' in sys.argv
+    enable_coverage = options.cov
     if enable_coverage:
         os.makedirs('.coverage', exist_ok=True)
         sys.argv.remove('--cov')
         import coverage
         coverage.process_startup()
     returncode = 0
+    backend = options.backend
+    msbuild_exe = shutil.which('msbuild')
     # Iterate over list in reverse order to find the last --backend arg
-    backend = Backend.ninja
-    for arg in reversed(sys.argv[1:]):
-        if arg.startswith('--backend'):
-            if arg.startswith('--backend=vs'):
-                backend = Backend.vs
-            elif arg == '--backend=xcode':
-                backend = Backend.xcode
-            break
+    # Auto-detect backend if unspecified
+    if backend is None:
+        if msbuild_exe is not None:
+            backend = 'vs' # Meson will auto-detect VS version to use
+        else:
+            backend = 'ninja'
+    # Set backend arguments for Meson
+    if backend.startswith('vs'):
+        backend = Backend.vs
+    elif backend == 'xcode':
+        backend = Backend.xcode
+    elif backend == 'ninja':
+        backend = Backend.ninja
+    else:
+        raise RuntimeError('Unknown backend: {!r}'.format(backend))
     # Running on a developer machine? Be nice!
     if not mesonlib.is_windows() and not mesonlib.is_haiku() and 'TRAVIS' not in os.environ:
         os.nice(20)
@@ -214,12 +230,17 @@ if __name__ == '__main__':
                         'coverage.process_startup()\n')
             env['COVERAGE_PROCESS_START'] = '.coveragerc'
             env['PYTHONPATH'] = os.pathsep.join([td] + env.get('PYTHONPATH', []))
-        returncode += subprocess.call(mesonlib.python_command + ['run_unittests.py', '-v'], env=env)
+        cmd = mesonlib.python_command + ['run_unittests.py', '-v']
+        returncode += subprocess.call(cmd, env=env)
         # Ubuntu packages do not have a binary without -6 suffix.
         if should_run_linux_cross_tests():
             print(mlog.bold('Running cross compilation tests.').get_text(mlog.colorize_console))
             print()
-            returncode += subprocess.call(mesonlib.python_command + ['run_cross_test.py', 'cross/ubuntu-armhf.txt'],
-                                          env=env)
-        returncode += subprocess.call(mesonlib.python_command + ['run_project_tests.py'] + sys.argv[1:], env=env)
-    sys.exit(returncode)
+            cmd = mesonlib.python_command + ['run_cross_test.py', 'cross/ubuntu-armhf.txt']
+            returncode += subprocess.call(cmd, env=env)
+        cmd = mesonlib.python_command + ['run_project_tests.py'] + sys.argv[1:]
+        returncode += subprocess.call(cmd, env=env)
+    return returncode
+
+if __name__ == '__main__':
+    sys.exit(main())
