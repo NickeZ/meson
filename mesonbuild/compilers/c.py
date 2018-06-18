@@ -913,8 +913,12 @@ class CCompiler(Compiler):
         stlibext = ['a']
         # We've always allowed libname to be both `foo` and `libfoo`,
         # and now people depend on it
-        if strict and not isinstance(self, VisualStudioCCompiler): # lib prefix is not usually used with msvc
+        # lib prefix is not usually used with msvc
+        if strict and not isinstance(self, VisualStudioCCompiler):
             prefixes = ['lib']
+        elif self.id == 'msvc' and libtype in ('default', 'shared-static', 'shared'):
+            # For shared libraries prioritize empty prefix over 'lib' prefix.
+            prefixes = ['', 'lib']
         else:
             prefixes = ['lib', '']
         # Library suffixes and prefixes
