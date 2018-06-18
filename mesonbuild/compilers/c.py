@@ -916,7 +916,7 @@ class CCompiler(Compiler):
         # lib prefix is not usually used with msvc
         if strict and not isinstance(self, VisualStudioCCompiler):
             prefixes = ['lib']
-        elif self.id == 'msvc' and libtype in ('default', 'shared-static', 'shared'):
+        elif self.id == 'msvc' and libtype in ('shared-static', 'shared'):
             # For shared libraries prioritize empty prefix over 'lib' prefix.
             prefixes = ['', 'lib']
         else:
@@ -925,8 +925,6 @@ class CCompiler(Compiler):
         if for_darwin(env.is_cross_build(), env):
             shlibext = ['dylib', 'so']
         elif for_windows(env.is_cross_build(), env):
-            # FIXME: .lib files can be import or static so we should read the
-            # file, figure out which one it is, and reject the wrong kind.
             if isinstance(self, VisualStudioCCompiler):
                 shlibext = ['lib']
             else:
@@ -939,18 +937,17 @@ class CCompiler(Compiler):
         else:
             # Linux/BSDs
             shlibext = ['so']
-        patterns = []
         # Search priority
-        if libtype in ('default', 'shared-static'):
-            patterns += self._get_patterns(env, prefixes, shlibext, True)
-            patterns += self._get_patterns(env, prefixes, stlibext, False)
+        if libtype == 'shared-static':
+            patterns = self._get_patterns(env, prefixes, shlibext, True)
+            patterns.extend([x for x in self._get_patterns(env, prefixes, stlibext, False) if x not in patterns])
         elif libtype == 'static-shared':
-            patterns += self._get_patterns(env, prefixes, stlibext, False)
-            patterns += self._get_patterns(env, prefixes, shlibext, True)
+            patterns = self._get_patterns(env, prefixes, stlibext, False)
+            patterns.extend([x for x in self._get_patterns(env, prefixes, shlibext, True) if x not in patterns])
         elif libtype == 'shared':
-            patterns += self._get_patterns(env, prefixes, shlibext, True)
+            patterns = self._get_patterns(env, prefixes, shlibext, True)
         elif libtype == 'static':
-            patterns += self._get_patterns(env, prefixes, stlibext, False)
+            patterns = self._get_patterns(env, prefixes, stlibext, False)
         else:
             raise AssertionError('BUG: unknown libtype {!r}'.format(libtype))
         return tuple(patterns)
@@ -978,8 +975,8 @@ class CCompiler(Compiler):
         if '*' in pattern:
             # NOTE: globbing matches directories and broken symlinks
             # so we have to do an isfile test on it later
-            return cls._sort_shlibs_openbsd(glob.glob(str(f)))
-        return [f.as_posix()]
+            return [Path(x) for x in cls._sort_shlibs_openbsd(glob.glob(str(f)))]
+        return [f]
 
     @staticmethod
     def _get_file_from_list(env, files: List[str]) -> str:
@@ -996,7 +993,7 @@ class CCompiler(Compiler):
                     return f
         # Run `lipo` and check if the library supports the arch we want
         for f in files:
-            if not os.path.isfile(f):
+            if not f.is_file():
                 continue
             archs = darwin_get_object_archs(f)
             if archs and env.machines.host.cpu_family in archs:
@@ -1012,6 +1009,30 @@ class CCompiler(Compiler):
         returns true if the output produced is 64-bit, false if 32-bit
         '''
         return self.sizeof('void *', '', env) == 8
+
+    @functools.lru_cache()
+    def verify_libtype(self, filename: Path, libtype: str):
+        """Return true if library is of type shared, and shared was requested.
+        Also returns true if library is static and static was requested.
+        Returns false otherwise.
+        """
+        # FIXME: shared-static and static-shared return the same for now
+        if libtype in ('shared-static', 'static-shared'):
+            return True
+        try:
+            proc = subprocess.Popen(['lib', '/list', filename.as_posix()], stdout=subprocess.PIPE)
+        except OSError:
+            mlog.debug("Failed to call lib, assuming file is valid")
+            return True
+
+        stdout, _ = proc.communicate()
+        stdout = stdout.decode('utf-8')
+        shlibname = filename.with_suffix('.dll').name
+        if libtype == 'static':
+            return shlibname not in stdout
+        elif libtype == 'shared':
+            return shlibname in stdout
+        raise AssertionError('BUG: unknown libtype: {!r}'.format(libtype))
 
     def find_library_real(self, libname, env, extra_dirs, code, libtype):
         # First try if we can just add the library as -l.
@@ -1047,7 +1068,9 @@ class CCompiler(Compiler):
                 trial = self._get_file_from_list(env, trial)
                 if not trial:
                     continue
-                return [trial]
+                if self.id == 'msvc' and not self.verify_libtype(trial, libtype):
+                    continue
+                return [trial.as_posix()]
         return None
 
     def find_library_impl(self, libname, env, extra_dirs, code, libtype):
@@ -1066,7 +1089,7 @@ class CCompiler(Compiler):
             return None
         return value[:]
 
-    def find_library(self, libname, env, extra_dirs, libtype='default'):
+    def find_library(self, libname, env, extra_dirs, libtype='shared-static'):
         code = 'int main(int argc, char **argv) { return 0; }'
         return self.find_library_impl(libname, env, extra_dirs, code, libtype)
 

@@ -916,6 +916,7 @@ find_library_permitted_kwargs = set([
     'has_headers',
     'required',
     'dirs',
+    'type',
 ])
 
 find_library_permitted_kwargs |= set(['header_' + k for k in header_permitted_kwargs])
@@ -1488,9 +1489,16 @@ class CompilerHolder(InterpreterObject):
         for i in search_dirs:
             if not os.path.isabs(i):
                 raise InvalidCode('Search directory %s is not an absolute path.' % i)
-        linkargs = self.compiler.find_library(libname, self.environment, search_dirs)
+        libtype = kwargs.get('type', 'shared-static')
+        if not isinstance(libtype, str):
+            raise InterpreterException('type must be a string')
+        if libtype not in ('shared-static', 'static-shared', 'static', 'shared'):
+            raise InterpreterException(
+                'type must be one of shared-static, static-shared, static or shared')
+        linkargs = self.compiler.find_library(libname, self.environment, search_dirs, libtype)
         if required and not linkargs:
-            raise InterpreterException('{} library {!r} not found'.format(self.compiler.get_display_language(), libname))
+            raise InterpreterException(
+                '{} library {!r} not found'.format(self.compiler.get_display_language(), libname))
         lib = dependencies.ExternalLibrary(libname, linkargs, self.environment,
                                            self.compiler.language)
         return ExternalLibraryHolder(lib, self.subproject)
