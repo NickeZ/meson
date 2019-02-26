@@ -699,6 +699,9 @@ class InternalTests(unittest.TestCase):
         stc = patterns[platform]['static']
         shrstc = shr + tuple([x for x in stc if x not in shr])
         stcshr = stc + tuple([x for x in shr if x not in stc])
+        # On windows we prioritize based on prefix...
+        if platform == 'windows-msvc':
+            shrstc = shrstc[0:2] + (shrstc[3],) + (shrstc[2],)
         p = cc.get_library_naming(env, 'shared')
         self.assertEqual(p, shr)
         p = cc.get_library_naming(env, 'static')
@@ -740,7 +743,7 @@ class InternalTests(unittest.TestCase):
                     'cygwin': {'shared': ('cyg{}.dll', 'cyg{}.dll.a', 'lib{}.dll',
                                           'lib{}.dll.a', '{}.dll', '{}.dll.a'),
                                'static': ('cyg{}.a',) + unix_static},
-                    'windows-msvc': {'shared': ('lib{}.lib', '{}.lib'),
+                    'windows-msvc': {'shared': ('{}.lib', 'lib{}.lib'),
                                      'static': msvc_static},
                     'windows-mingw': {'shared': ('lib{}.dll.a', 'lib{}.lib', 'lib{}.dll',
                                                  '{}.dll.a', '{}.lib', '{}.dll'),

@@ -913,16 +913,18 @@ class CCompiler(Compiler):
         stlibext = ['a']
         # We've always allowed libname to be both `foo` and `libfoo`,
         # and now people depend on it
-        if strict and not isinstance(self, VisualStudioCCompiler): # lib prefix is not usually used with msvc
+        if strict and not isinstance(self, VisualStudioCCompiler):
             prefixes = ['lib']
+        elif (isinstance(self, VisualStudioCCompiler) and
+              libtype in ('shared-static', 'shared')):
+            # For shared libraries prioritize empty prefix over 'lib' prefix.
+            prefixes = ['', 'lib']
         else:
             prefixes = ['lib', '']
         # Library suffixes and prefixes
         if for_darwin(env.is_cross_build(), env):
             shlibext = ['dylib', 'so']
         elif for_windows(env.is_cross_build(), env):
-            # FIXME: .lib files can be import or static so we should read the
-            # file, figure out which one it is, and reject the wrong kind.
             if isinstance(self, VisualStudioCCompiler):
                 shlibext = ['lib']
             else:
@@ -1008,6 +1010,30 @@ class CCompiler(Compiler):
         '''
         return self.sizeof('void *', '', env) == 8
 
+    @functools.lru_cache()
+    def verify_libtype(self, filename: Path, libtype: str):
+        """Return true if library is of type shared, and shared was requested.
+        Also returns true if library is static and static was requested.
+        Returns false otherwise.
+        """
+        # FIXME: shared-static and static-shared return the same for now
+        if libtype in ('shared-static', 'static-shared'):
+            return True
+        try:
+            proc = subprocess.Popen(['lib', '/list', filename.as_posix()], stdout=subprocess.PIPE)
+        except OSError:
+            mlog.debug("Failed to call lib, assuming file is valid")
+            return True
+
+        stdout, _ = proc.communicate()
+        stdout = stdout.decode('utf-8')
+        shlibname = filename.with_suffix('.dll').name
+        if libtype == 'static':
+            return shlibname not in stdout
+        elif libtype == 'shared':
+            return shlibname in stdout
+        raise AssertionError('BUG: unknown libtype: {!r}'.format(libtype))
+
     def find_library_real(self, libname, env, extra_dirs, code, libtype):
         # First try if we can just add the library as -l.
         # Gcc + co seem to prefer builtin lib dirs to -L dirs.
@@ -1044,6 +1070,9 @@ class CCompiler(Compiler):
                     continue
                 trial = self._get_file_from_list(env, trial)
                 if not trial:
+                    continue
+                if (isinstance(self, VisualStudioCCompiler) and
+                        not self.verify_libtype(trial, libtype)):
                     continue
                 return [trial.as_posix()]
         return None
